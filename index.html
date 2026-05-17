@@ -585,6 +585,7 @@ tr:hover td { background: var(--cream); }
           </div>
         </div>
         <button class="btn btn-orange btn-full" id="posFetchBtn" onclick="fetchPos()">拉取 POS 資料</button>
+        <button class="btn btn-ghost btn-sm" style="margin-top:8px;width:100%" onclick="diagnosePOS()">🔍 診斷 POS 資料結構（Debug）</button>
       </div>
 
       <div id="posPreviewCard" class="card hidden">
@@ -987,16 +988,18 @@ function initFirebase() {
     return;
   }
   try {
-    if (firebase.apps.length === 0) {
-      firebase.initializeApp(cfg);
-    }
-    db = firebase.firestore();
+    // Safe init: reuse existing app if already initialized
+    const app = firebase.apps.length === 0
+      ? firebase.initializeApp(cfg)
+      : firebase.app();
+    db = firebase.firestore(app);
     setSyncStatus('saving');
     startSync();
   } catch(e) {
-    console.error('Firebase init error', e);
+    console.error('Firebase init error:', e);
     setSyncStatus('error');
     loadLocal();
+    toast('Firebase 連線失敗：' + e.message, 'error');
   }
 }
 
@@ -1447,39 +1450,89 @@ async function fetchPos() {
       cur.setMonth(cur.getMonth()+1);
     }
 
-    // Fetch each month's doc
+    // Fetch each month's doc — try multiple Firestore data structures
     const dayMap = {};
+
+    function parseTimestamp(ts) {
+      if (!ts) return null;
+      if (typeof ts === 'string') return ts.slice(0, 10);
+      if (ts.toDate) return ts.toDate().toISOString().slice(0, 10);
+      if (ts.seconds) return new Date(ts.seconds * 1000).toISOString().slice(0, 10);
+      return null;
+    }
+
+    function mergeDay(dateKey, total, orderCount) {
+      if (!dateKey || dateKey < start || dateKey > end) return;
+      if (!dayMap[dateKey]) dayMap[dateKey] = { orders: 0, total: 0 };
+      dayMap[dateKey].total += Number(total) || 0;
+      dayMap[dateKey].orders += Number(orderCount) || 1;
+    }
+
     for (const ym of months) {
       try {
-        const snap = await db.collection('pos').doc('sales_' + ym).get();
-        if (!snap.exists) continue;
-        const docData = snap.data();
-        // Try different data structures
-        const entries = docData.days || docData.entries || docData.records || [];
-        if (Array.isArray(entries)) {
-          entries.forEach(entry => {
-            const d = entry.date || entry.ts?.toDate?.().toISOString().slice(0,10);
-            if (!d) return;
-            const dateKey = d.slice(0,10);
-            if (dateKey < start || dateKey > end) return;
-            if (!dayMap[dateKey]) dayMap[dateKey] = { orders: 0, total: 0, items: [] };
-            dayMap[dateKey].total += Number(entry.total || entry.amount || 0);
-            dayMap[dateKey].orders += 1;
-            if (entry.items) dayMap[dateKey].items.push(...entry.items);
-          });
-        } else {
-          // Flat doc with date keys
-          Object.entries(docData).forEach(([key, val]) => {
-            if (typeof val !== 'object' || !val) return;
-            const dateKey = key.length === 8 ? `${key.slice(0,4)}-${key.slice(4,6)}-${key.slice(6,8)}` : key;
-            if (dateKey < start || dateKey > end) return;
-            if (!dayMap[dateKey]) dayMap[dateKey] = { orders: 0, total: 0, items: [] };
-            dayMap[dateKey].total += Number(val.total || val.revenue || 0);
-            dayMap[dateKey].orders += (val.count || val.orders || 1);
-          });
+        const docRef = db.collection('pos').doc('sales_' + ym);
+        const snap = await docRef.get();
+
+        if (snap.exists) {
+          const docData = snap.data();
+          console.log('[POS] sales_' + ym + ' fields:', Object.keys(docData));
+
+          // Structure A: array field (orders / records / days / data / items / sales)
+          // POS structure confirmed: field "items" contains array of orders
+          // Each order: { total, ts (ISO string), id, discount, custType, items[] }
+          const arrField = docData.items || docData.orders || docData.records || docData.days
+                        || docData.data || docData.sales || docData.transactions;
+          if (Array.isArray(arrField) && arrField.length > 0) {
+            arrField.forEach(entry => {
+              const dk = entry.date || parseTimestamp(entry.ts) || parseTimestamp(entry.timestamp) || parseTimestamp(entry.createdAt);
+              mergeDay(dk, entry.total || entry.amount || entry.revenue, 1);
+            });
+          } else {
+            // Structure B: date-keyed fields { "2026-05-01": {total, count}, ... }
+            // or { "20260501": {total}, ... }
+            let foundDateKeys = false;
+            Object.entries(docData).forEach(([key, val]) => {
+              if (typeof val !== 'object' || !val || Array.isArray(val)) return;
+              // Detect date key patterns: YYYY-MM-DD or YYYYMMDD or MM/DD
+              const isDateKey = /^\d{4}-\d{2}-\d{2}$/.test(key) || /^\d{8}$/.test(key);
+              if (!isDateKey) return;
+              foundDateKeys = true;
+              const dk = /^\d{8}$/.test(key)
+                ? `${key.slice(0,4)}-${key.slice(4,6)}-${key.slice(6,8)}`
+                : key;
+              mergeDay(dk, val.total || val.revenue || val.amount, val.count || val.orders || val.orderCount || 1);
+            });
+
+            // Structure C: direct fields ts, total, items on the doc itself (single-order doc)
+            if (!foundDateKeys && (docData.ts || docData.total)) {
+              const dk = parseTimestamp(docData.ts) || parseTimestamp(docData.date);
+              mergeDay(dk, docData.total || docData.amount, 1);
+            }
+          }
         }
-      } catch(e) { console.warn('Month fetch error', ym, e); }
+
+        // Structure D: sub-collection "orders" or "records" under sales_YYYYMM
+        const subColNames = ['orders', 'records', 'transactions', 'sales'];
+        for (const colName of subColNames) {
+          try {
+            const subSnap = await docRef.collection(colName).get();
+            if (!subSnap.empty) {
+              console.log('[POS] Found sub-collection:', colName, 'with', subSnap.size, 'docs');
+              subSnap.forEach(d => {
+                const entry = d.data();
+                const dk = entry.date || parseTimestamp(entry.ts) || parseTimestamp(entry.timestamp)
+                         || parseTimestamp(entry.createdAt) || parseTimestamp(entry.date);
+                mergeDay(dk, entry.total || entry.amount || entry.revenue, 1);
+              });
+              break; // found, no need to try others
+            }
+          } catch(subErr) { /* sub-collection may not exist */ }
+        }
+
+      } catch(e) { console.warn('[POS] Month fetch error', ym, e.message); }
     }
+
+    console.log('[POS] dayMap result:', dayMap);
 
     posResults = Object.entries(dayMap).sort((a,b) => a[0].localeCompare(b[0])).map(([date, info]) => ({
       date, total: info.total, orders: info.orders, desc: `POS 銷售 ${info.orders} 筆`
@@ -1539,6 +1592,53 @@ async function importPos() {
   toast(`已匯入 ${toImport.length} 天的銷售記錄`, 'success');
   document.getElementById('posPreviewCard').classList.add('hidden');
   renderLedger();
+}
+
+// ════════════════════════════════════════════════════════
+// POS DIAGNOSTICS
+// ════════════════════════════════════════════════════════
+async function diagnosePOS() {
+  if (!db) { toast('Firebase 尚未連線，請先儲存設定並重新整理頁面', 'error'); return; }
+  const ym = new Date().toISOString().slice(0,7).replace('-',''); // e.g. "202605"
+  const docId = 'sales_' + ym;
+  let report = `=== POS 診斷報告 ===\n月份文件: pos/${docId}\n\n`;
+  try {
+    const docRef = db.collection('pos').doc(docId);
+    const snap = await docRef.get();
+    if (!snap.exists) {
+      report += '❌ 文件不存在\n';
+      // Try listing other docs
+      try {
+        const colSnap = await db.collection('pos').limit(10).get();
+        report += `\npos collection 現有文件：\n`;
+        colSnap.forEach(d => { report += `  - ${d.id}\n`; });
+      } catch(e) { report += '無法列出 collection: ' + e.message; }
+    } else {
+      const data = snap.data();
+      report += `✅ 文件存在\n欄位：${Object.keys(data).join(', ')}\n`;
+      Object.entries(data).forEach(([k,v]) => {
+        const type = Array.isArray(v) ? `Array(${v.length})` : typeof v;
+        report += `  ${k}: ${type}\n`;
+        if (Array.isArray(v) && v.length > 0) {
+          report += `    第一筆: ${JSON.stringify(v[0]).slice(0,120)}\n`;
+        }
+      });
+    }
+    // Check sub-collections
+    for (const col of ['orders','records','transactions','sales']) {
+      try {
+        const sub = await docRef.collection(col).limit(1).get();
+        if (!sub.empty) {
+          report += `\n✅ Sub-collection "${col}" 存在 (${sub.size} 筆)\n`;
+          report += `  Sample: ${JSON.stringify(sub.docs[0].data()).slice(0,200)}\n`;
+        }
+      } catch(e) {}
+    }
+  } catch(e) {
+    report += '❌ 讀取失敗: ' + e.message;
+  }
+  console.log(report);
+  alert(report);
 }
 
 // ════════════════════════════════════════════════════════
@@ -1938,14 +2038,13 @@ function saveFirebaseConfig() {
   };
   if (!cfg.apiKey || !cfg.projectId) { toast('請填寫完整的 Firebase 設定', 'error'); return; }
   localStorage.setItem(FB_CONFIG_KEY, JSON.stringify(cfg));
-  // Re-init Firebase
-  if (firebase.apps.length > 0) {
-    firebase.apps.forEach(app => app.delete());
+  // Must reload for clean Firebase initialization
+  if (confirm('Firebase 設定已儲存！\n\n需要重新整理頁面才能連線，請重新輸入密碼。\n\n是否立即重新整理？')) {
+    location.reload();
+  } else {
+    toast('請手動重新整理頁面以套用 Firebase 設定', 'success');
+    closeSettings();
   }
-  db = null;
-  initFirebase();
-  toast('Firebase 已重新連線', 'success');
-  closeSettings();
 }
 
 function loadAnthropicKeyToForm() {
