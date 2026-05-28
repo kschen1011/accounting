@@ -310,7 +310,7 @@ tr:hover td { background: var(--cream); }
 .pos-tag { font-size: 10px; background: var(--paper); color: var(--ink3); padding: 2px 6px; border-radius: 4px; }
 .pos-tag.done { background: #e8f4e0; color: var(--green); }
 
-/* ── AI INPUT ─────────────────────────────────────────── */
+
 .ai-label { display: inline-flex; align-items: center; gap: 5px; font-size: 11px; font-weight: 600; color: var(--blue-t); background: #e8f0ff; padding: 3px 8px; border-radius: 4px; margin-bottom: 10px; }
 .ai-preview { margin-top: 14px; }
 .ai-item { background: var(--paper); border-radius: 8px; padding: 12px; margin-bottom: 8px; display: flex; align-items: center; gap: 10px; }
@@ -410,6 +410,12 @@ tr:hover td { background: var(--cream); }
 .selectors-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
 .selectors-row select { flex: 1; min-width: 100px; }
 
+
+/* ── MATERIAL LIBRARY ─────────────────────────────────── */
+.mat-item { display: flex; align-items: center; gap: 10px; padding: 10px; border-top: 1px solid var(--border); }
+.mat-name { flex: 1; font-weight: 500; }
+.mat-unit { font-size: 12px; color: var(--ink3); background: var(--paper); padding: 2px 8px; border-radius: 4px; }
+
 /* ── RESPONSIVE ───────────────────────────────────────── */
 @media (min-width: 600px) {
   .stats-row { grid-template-columns: repeat(3, 1fr); }
@@ -489,7 +495,7 @@ tr:hover td { background: var(--cream); }
   <nav class="tabs" id="mainTabs">
     <button class="tab-btn active" data-tab="analytics">📊 數據</button>
     <button class="tab-btn" data-tab="pos">🔄 POS</button>
-    <button class="tab-btn" data-tab="ai">🤖 智慧</button>
+    <button class="tab-btn" data-tab="materials">📦 材料庫</button>
     <button class="tab-btn" data-tab="manual">✏️ 記帳</button>
     <button class="tab-btn" data-tab="ledger">📋 明細</button>
     <button class="tab-btn" data-tab="pl">📄 損益</button>
@@ -600,30 +606,62 @@ tr:hover td { background: var(--cream); }
       </div>
     </section>
 
-    <!-- ── TAB: 智慧輸入 ──────────────────────────────── -->
-    <section id="tab-ai" class="tab-panel">
+
+    <!-- ── TAB: 材料庫 ───────────────────────────────────── -->
+    <section id="tab-materials" class="tab-panel">
       <div class="card">
-        <span class="ai-label">🤖 AI 智慧解析</span>
-        <p style="font-size:13px;color:var(--ink2);margin-bottom:12px;line-height:1.6">
-          用任意方式描述支出或收入，AI 自動歸類。<br>
-          例：「奶油5包共1200元」、「今天實體店收入8500」
-        </p>
-        <div class="form-group" style="margin-bottom:12px">
-          <label class="form-label">自然語言輸入</label>
-          <textarea class="form-textarea" id="aiInput" placeholder="輸入任意格式的記帳內容..."></textarea>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+          <div class="card-title" style="margin:0;border:none;padding:0">📦 材料庫管理</div>
+          <button class="btn btn-gold btn-sm" onclick="openMatForm()">＋ 新增材料</button>
         </div>
-        <div class="form-group" style="margin-bottom:12px">
-          <label class="form-label">日期</label>
-          <input type="date" class="form-input" id="aiDate">
+        <div class="filter-bar" style="grid-template-columns:1fr 1fr;margin-bottom:12px">
+          <div class="form-group">
+            <label class="form-label">篩選類別</label>
+            <select class="form-select" id="matFilterCat" onchange="renderMaterials()">
+              <option value="">全部</option>
+              <option value="原物料/食材">原物料/食材</option>
+              <option value="包材">包材</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">搜尋品名</label>
+            <input type="text" class="form-input" id="matSearch" placeholder="輸入關鍵字" oninput="renderMaterials()">
+          </div>
         </div>
-        <button class="btn btn-primary btn-full" id="aiParseBtn" onclick="doAiParse()">🤖 AI 解析</button>
-        <div id="aiLoading" class="loading hidden"><div class="spinner"></div> 解析中...</div>
+        <div id="matList"></div>
       </div>
 
-      <div id="aiPreviewCard" class="card hidden">
-        <div class="card-title">解析結果</div>
-        <div id="aiPreviewList"></div>
-        <button class="btn btn-green btn-full" style="margin-top:12px" onclick="importAiItems()">確認寫入帳本</button>
+      <!-- Add/Edit material form -->
+      <div id="matFormCard" class="card hidden" style="border:2px solid var(--gold)">
+        <div class="card-title" id="matFormTitle">新增材料</div>
+        <input type="hidden" id="matEditId">
+        <div class="form-row cols2">
+          <div class="form-group">
+            <label class="form-label">品名 *</label>
+            <input type="text" class="form-input" id="matName" placeholder="例：杏仁粉">
+          </div>
+          <div class="form-group">
+            <label class="form-label">類別 *</label>
+            <select class="form-select" id="matCat">
+              <option value="原物料/食材">原物料/食材</option>
+              <option value="包材">包材</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-row cols2">
+          <div class="form-group">
+            <label class="form-label">預設單位</label>
+            <select class="form-select" id="matUnit"></select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">備註</label>
+            <input type="text" class="form-input" id="matNote" placeholder="選填">
+          </div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-green btn-sm" onclick="saveMaterial()">儲存</button>
+          <button class="btn btn-ghost btn-sm" onclick="closeMatForm()">取消</button>
+        </div>
       </div>
     </section>
 
@@ -678,41 +716,58 @@ tr:hover td { background: var(--cream); }
           </div>
         </div>
 
-        <!-- Ingredient fields -->
+        <!-- Sub-item fields (material library) -->
         <div id="ingWrap" class="hidden">
           <div class="ing-block">
-            <div class="section-label">🌾 食材明細（選填）</div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+              <div class="section-label" style="margin:0">📦 細項明細</div>
+              <button type="button" class="btn btn-ghost btn-sm" onclick="openAddSubItem()">＋ 新增細項</button>
+            </div>
+            <div id="subItemsList"></div>
+            <div id="subItemTotal" style="text-align:right;font-size:13px;color:var(--ink2);margin-top:6px;display:none">
+              細項合計：<strong id="subItemTotalAmt" style="font-family:'Noto Serif TC',serif;color:var(--green)">$0</strong>
+            </div>
+          </div>
+          <!-- Add sub-item form -->
+          <div id="subItemForm" class="ing-block hidden" style="margin-top:8px;border:1.5px solid var(--gold)">
+            <div class="section-label" style="margin-bottom:10px;color:var(--gold)">新增細項</div>
             <div class="form-row">
               <div class="form-group">
-                <label class="form-label">食材品名</label>
-                <input type="text" class="form-input" id="ingName" placeholder="例：杏仁粉">
+                <label class="form-label">從材料庫選取</label>
+                <select class="form-select" id="subMatSelect" onchange="onSubMatSelect()">
+                  <option value="">-- 選擇材料（選填）--</option>
+                </select>
+              </div>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label class="form-label">品名 *</label>
+                <input type="text" class="form-input" id="subName" placeholder="品名">
               </div>
             </div>
             <div class="form-row cols3">
               <div class="form-group">
-                <label class="form-label">單位重量</label>
-                <input type="number" class="form-input" id="ingWeight" placeholder="500" min="0" oninput="calcIngAmt()">
+                <label class="form-label">數量</label>
+                <input type="number" class="form-input" id="subQty" placeholder="1" min="0" oninput="calcSubTotal()">
               </div>
               <div class="form-group">
                 <label class="form-label">單位</label>
-                <select class="form-select" id="ingUnit">
-                  <option>g</option><option>kg</option><option>ml</option><option>L</option>
-                </select>
+                <select class="form-select" id="subUnit"></select>
               </div>
               <div class="form-group">
-                <label class="form-label">訂購數量</label>
-                <input type="number" class="form-input" id="ingQty" placeholder="10" min="0" oninput="calcIngAmt()">
+                <label class="form-label">單價（元）</label>
+                <input type="number" class="form-input" id="subUnitPrice" placeholder="0" min="0" oninput="calcSubTotal()">
               </div>
             </div>
             <div class="form-row cols2">
               <div class="form-group">
-                <label class="form-label">每單位單價（元）</label>
-                <input type="number" class="form-input" id="ingUnitPrice" placeholder="120" min="0" oninput="calcIngAmt()">
+                <label class="form-label">小計（自動）</label>
+                <input type="number" class="form-input" id="subSubtotal" readonly style="background:var(--paper)">
               </div>
-              <div class="form-group">
-                <label class="form-label">小計（自動帶入）</label>
-                <input type="number" class="form-input" id="ingSubtotal" placeholder="0" readonly style="background:var(--paper)">
-              </div>
+            </div>
+            <div style="display:flex;gap:8px">
+              <button type="button" class="btn btn-gold btn-sm" onclick="confirmAddSubItem()">確認新增</button>
+              <button type="button" class="btn btn-ghost btn-sm" onclick="cancelAddSubItem()">取消</button>
             </div>
           </div>
         </div>
@@ -823,23 +878,6 @@ tr:hover td { background: var(--cream); }
       <button class="btn btn-orange btn-full" onclick="saveFirebaseConfig()">儲存並重新連線</button>
     </div>
 
-    <div class="modal-section">
-      <div class="modal-section-title">🤖 AI 設定</div>
-      <div class="form-group" style="margin-bottom:12px">
-        <label class="form-label">Anthropic API Key（智慧輸入功能需要）</label>
-        <input type="text" class="form-input" id="anthropicKey" placeholder="sk-ant-...">
-      </div>
-      <button class="btn btn-primary btn-full" onclick="saveAnthropicKey()">儲存 API Key</button>
-    </div>
-
-    <div class="modal-section">
-      <div class="modal-section-title">📊 資料管理</div>
-      <div style="display:flex;gap:8px;flex-wrap:wrap">
-        <button class="btn btn-ghost btn-sm" onclick="exportBackup()">📦 匯出備份 JSON</button>
-        <button class="btn btn-ghost btn-sm" onclick="importBackupPrompt()">📥 匯入備份</button>
-      </div>
-    </div>
-
     <button class="btn btn-ghost btn-full" style="margin-top:8px" onclick="closeSettings()">關閉</button>
   </div>
 </div>
@@ -860,7 +898,7 @@ const ANT_KEY_STORAGE = 'hk_ant_key';
 const DATA_KEY = 'hk_data_local';
 
 const INCOME_CATS = ['實體店面','網路訂單','市集/展覽','百貨通路','其他收入'];
-const EXPENSE_CATS = ['原物料/食材','包材','薪資/人事','租金/水電','行銷費用','公關費用','裝潢工程','出國參展-機票','出國參展-住宿','國際空運','百貨抽成','員工福利','雜支'];
+const EXPENSE_CATS = ['原物料/食材','包材','薪資/人事','租金/水電','行銷費用','公關費用','裝潢工程','出國參展-機票','出國參展-住宿','國際空運','百貨抽成','員工福利','營業費用','稅費','雜支'];
 const BENEFIT_SUBS = ['餐食','聚餐','年節送禮','獎金','勞健保補貼費用'];
 
 const CAT_GROUPS = {
@@ -871,8 +909,12 @@ const CAT_GROUPS = {
   '資本支出': ['裝潢工程'],
   '參展與物流': ['出國參展-機票','出國參展-住宿','國際空運','百貨抽成'],
   '員工福利': ['員工福利'],
+  '營業費用': ['營業費用'],
+  '稅費': ['稅費'],
   '雜支': ['雜支']
 };
+const DETAIL_CATS = ['原物料/食材','包材'];
+const MAT_UNITS = ['g','kg','ml','L','顆','個','包','罐','瓶','張','件','組'];
 
 const GREEN_PALETTE = ['#5A9B30','#7BB94A','#9DD46A','#C0E496','#D4E9A0'];
 const EXPENSE_PALETTE = ['#D94133','#1A4F9E','#C49A2A','#6C5CE7','#E05A10','#3A9B8A','#9B3A8A','#9B6A3A','#3A3A9B','#6A9B3A','#D94133','#9B9690','#4A4A4A'];
@@ -889,7 +931,7 @@ let appData = { items: [], updatedAt: '' };
 let manualType = 'income';
 let saveTimer = null;
 let posResults = [];
-let aiParsed = [];
+let manSubItems = [];  // sub-items for current manual entry
 
 // ════════════════════════════════════════════════════════
 // PASSWORD SYSTEM
@@ -1075,7 +1117,6 @@ function initApp() {
   initQuickDates();
   initYearSelects();
   loadFirebaseConfigToForm();
-  loadAnthropicKeyToForm();
   initFirebase();
 }
 
@@ -1179,6 +1220,7 @@ function refreshAllViews() {
   renderAnalytics();
   renderLedger();
   renderPL();
+  if (document.getElementById('tab-materials').classList.contains('active')) renderMaterials();
 }
 
 // ════════════════════════════════════════════════════════
@@ -1193,6 +1235,7 @@ document.querySelectorAll('.tab-btn').forEach(btn => {
     if (btn.dataset.tab === 'analytics') renderAnalytics();
     if (btn.dataset.tab === 'ledger') renderLedger();
     if (btn.dataset.tab === 'pl') renderPL();
+    if (btn.dataset.tab === 'materials') renderMaterials();
   });
 });
 
@@ -1642,88 +1685,6 @@ async function diagnosePOS() {
 }
 
 // ════════════════════════════════════════════════════════
-// AI INPUT
-// ════════════════════════════════════════════════════════
-async function doAiParse() {
-  const text = document.getElementById('aiInput').value.trim();
-  if (!text) { toast('請輸入描述文字', 'error'); return; }
-  const apiKey = localStorage.getItem(ANT_KEY_STORAGE);
-  if (!apiKey) { toast('請先在設定中填入 Anthropic API Key', 'error'); openSettings(); return; }
-
-  const btn = document.getElementById('aiParseBtn');
-  btn.disabled = true; btn.textContent = '解析中...';
-  document.getElementById('aiLoading').classList.remove('hidden');
-  document.getElementById('aiPreviewCard').classList.add('hidden');
-  aiParsed = [];
-
-  const systemPrompt = `你是半吊子廚房的智慧記帳助理。請解析用戶輸入的記帳內容，回傳 JSON 陣列，格式如下：
-[{"type":"income|expense","cat":"科目名稱","desc":"摘要說明","amount":金額數字}]
-
-收入科目：${INCOME_CATS.join('、')}
-支出科目：${EXPENSE_CATS.join('、')}
-
-只回傳 JSON，不要有其他文字。如有多筆，每筆一個物件。金額為正整數。`;
-
-  try {
-    const resp = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey,
-        'anthropic-version': '2023-06-01',
-        'anthropic-dangerous-direct-browser-access': 'true'
-      },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
-        max_tokens: 1000,
-        system: systemPrompt,
-        messages: [{ role:'user', content: text }]
-      })
-    });
-    const data = await resp.json();
-    const raw = data.content?.[0]?.text || '[]';
-    const clean = raw.replace(/```json|```/g,'').trim();
-    aiParsed = JSON.parse(clean);
-    renderAiPreview();
-  } catch(e) {
-    toast('解析失敗：' + e.message, 'error');
-    console.error(e);
-  } finally {
-    btn.disabled = false; btn.textContent = '🤖 AI 解析';
-    document.getElementById('aiLoading').classList.add('hidden');
-  }
-}
-
-function renderAiPreview() {
-  const card = document.getElementById('aiPreviewCard');
-  const list = document.getElementById('aiPreviewList');
-  if (!aiParsed.length) { toast('未能解析出有效記錄', 'error'); return; }
-  list.innerHTML = aiParsed.map((item,i) => `
-    <div class="ai-item">
-      <span class="ai-item-type ${item.type}">${item.type==='income'?'收入':'支出'}</span>
-      <div class="ai-item-info">
-        <div class="ai-item-desc">${item.desc || item.cat}</div>
-        <div class="ai-item-cat">${item.cat}</div>
-      </div>
-      <div class="ai-item-amt ${item.type==='income'?'td-income':'td-expense'}">$${fmtAmt(item.amount)}</div>
-    </div>
-  `).join('');
-  card.classList.remove('hidden');
-}
-
-function importAiItems() {
-  const date = document.getElementById('aiDate').value;
-  aiParsed.forEach(item => {
-    addItem({ type: item.type, cat: item.cat, date, desc: item.desc || '', amount: item.amount, note: '' });
-  });
-  toast(`已匯入 ${aiParsed.length} 筆記錄`, 'success');
-  document.getElementById('aiPreviewCard').classList.add('hidden');
-  document.getElementById('aiInput').value = '';
-  aiParsed = [];
-  renderLedger();
-}
-
-// ════════════════════════════════════════════════════════
 // MANUAL ENTRY
 // ════════════════════════════════════════════════════════
 function setType(type) {
@@ -1731,23 +1692,19 @@ function setType(type) {
   document.getElementById('typeIncome').classList.toggle('active', type==='income');
   document.getElementById('typeExpense').classList.toggle('active', type==='expense');
   populateCatSelect('manCat', type);
-  document.getElementById('ingWrap').classList.add('hidden');
-  document.getElementById('benefitSubWrap').classList.add('hidden');
+  // Let onCatChange decide visibility based on the newly selected default cat
+  onCatChange();
 }
 
 function onCatChange() {
   const cat = document.getElementById('manCat').value;
-  document.getElementById('ingWrap').classList.toggle('hidden', cat !== '原物料/食材');
+  const isDetail = DETAIL_CATS.includes(cat);
+  document.getElementById('ingWrap').classList.toggle('hidden', !isDetail);
   document.getElementById('benefitSubWrap').classList.toggle('hidden', cat !== '員工福利');
+  if (isDetail) { manSubItems = []; renderSubItemsUI(); }
 }
 
-function calcIngAmt() {
-  const qty = Number(document.getElementById('ingQty').value) || 0;
-  const price = Number(document.getElementById('ingUnitPrice').value) || 0;
-  const subtotal = qty * price;
-  document.getElementById('ingSubtotal').value = subtotal;
-  if (subtotal) document.getElementById('manAmount').value = subtotal;
-}
+function calcIngAmt() {} // replaced by sub-items system
 
 function doManualAdd() {
   const date = document.getElementById('manDate').value;
@@ -1762,15 +1719,8 @@ function doManualAdd() {
 
   const item = { type: manualType, cat, date, desc, amount, note };
 
-  if (cat === '原物料/食材') {
-    const ingName = document.getElementById('ingName').value.trim();
-    if (ingName) {
-      item.ingName = ingName;
-      item.ingWeight = Number(document.getElementById('ingWeight').value) || 0;
-      item.ingUnit = document.getElementById('ingUnit').value;
-      item.ingQty = Number(document.getElementById('ingQty').value) || 0;
-      item.ingUnitPrice = Number(document.getElementById('ingUnitPrice').value) || 0;
-    }
+  if (DETAIL_CATS.includes(cat) && manSubItems.length) {
+    item.subItems = [...manSubItems];
   }
 
   if (cat === '員工福利') {
@@ -1779,7 +1729,9 @@ function doManualAdd() {
 
   addItem(item);
   toast('記錄已新增 ✓', 'success');
-  ['manAmount','manDesc','manNote','ingName','ingWeight','ingQty','ingUnitPrice','ingSubtotal'].forEach(id => {
+  manSubItems = [];
+  renderSubItemsUI();
+  ['manAmount','manDesc','manNote'].forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = '';
   });
@@ -1957,58 +1909,148 @@ function renderPL() {
 }
 
 // ════════════════════════════════════════════════════════
-// EXCEL EXPORT
+// CSV / EXCEL EXPORT (重構版)
 // ════════════════════════════════════════════════════════
 function exportExcel() {
   const year = document.getElementById('pl-year').value;
   const month = document.getElementById('pl-month').value;
-  const items = filterItems({ year, month });
+  const allItems = filterItems({ year, month });
   const wb = XLSX.utils.book_new();
 
-  // Sheet 1: 總表
-  const months = month ? [month] : ['01','02','03','04','05','06','07','08','09','10','11','12'];
-  const summaryRows = [['月份','總收入','食材成本','包材成本','銷貨毛利',...Object.keys(CAT_GROUPS),'淨利','毛利率']];
+  const months = month
+    ? [month]
+    : ['01','02','03','04','05','06','07','08','09','10','11','12'];
+
+  // ── Sheet 1: 收支總表 ────────────────────────────────────
+  const summaryHeader = [
+    '月份','銷貨收入','食材成本','包材成本','銷貨毛利',
+    '薪資/人事','租金/水電','行銷費用','公關費用','裝潢工程',
+    '出國參展-機票','出國參展-住宿','國際空運','百貨抽成',
+    '員工福利','營業費用','稅費','雜支',
+    '總支出','淨利','毛利率'
+  ];
+  const summaryRows = [summaryHeader];
   months.forEach(m => {
-    const mi = items.filter(i => i.date.slice(5,7) === m);
+    const mi = allItems.filter(i => i.date.slice(5,7) === m);
     const totalInc = mi.filter(i=>i.type==='income').reduce((s,i)=>s+Number(i.amount),0);
-    const foodCost = mi.filter(i=>i.cat==='原物料/食材').reduce((s,i)=>s+Number(i.amount),0);
-    const packCost = mi.filter(i=>i.cat==='包材').reduce((s,i)=>s+Number(i.amount),0);
+    if (!totalInc && !mi.filter(i=>i.type==='expense').length) return;
+    const getExp = cat => mi.filter(i=>i.type==='expense'&&i.cat===cat).reduce((s,i)=>s+Number(i.amount),0);
+    const foodCost  = getExp('原物料/食材');
+    const packCost  = getExp('包材');
     const grossProfit = totalInc - foodCost - packCost;
-    const groupTotals = Object.values(CAT_GROUPS).map(cats =>
-      cats.reduce((s,c) => s + mi.filter(i=>i.type==='expense'&&i.cat===c).reduce((ss,i)=>ss+Number(i.amount),0), 0)
-    );
-    const totalExp = mi.filter(i=>i.type==='expense').reduce((s,i)=>s+Number(i.amount),0);
+    const salary    = getExp('薪資/人事');
+    const rent      = getExp('租金/水電');
+    const marketing = getExp('行銷費用');
+    const pr        = getExp('公關費用');
+    const renovation= getExp('裝潢工程');
+    const airTicket = getExp('出國參展-機票');
+    const hotel     = getExp('出國參展-住宿');
+    const freight   = getExp('國際空運');
+    const commission= getExp('百貨抽成');
+    const welfare   = getExp('員工福利');
+    const opex      = getExp('營業費用');
+    const tax       = getExp('稅費');
+    const misc      = getExp('雜支');
+    const totalExp  = mi.filter(i=>i.type==='expense').reduce((s,i)=>s+Number(i.amount),0);
     const netProfit = totalInc - totalExp;
-    const margin = totalInc > 0 ? Math.round(netProfit/totalInc*100) + '%' : '0%';
-    if (totalInc || totalExp) summaryRows.push([m+'月', totalInc, foodCost, packCost, grossProfit, ...groupTotals, netProfit, margin]);
+    const margin    = totalInc > 0 ? (netProfit/totalInc*100).toFixed(1)+'%' : '0%';
+    summaryRows.push([
+      parseInt(m)+'月', totalInc, foodCost, packCost, grossProfit,
+      salary, rent, marketing, pr, renovation,
+      airTicket, hotel, freight, commission,
+      welfare, opex, tax, misc,
+      totalExp, netProfit, margin
+    ]);
   });
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(summaryRows), '總表');
+  // Add total row
+  if (summaryRows.length > 1) {
+    const dataRows = summaryRows.slice(1);
+    const totals = ['合計'];
+    for (let c = 1; c < summaryHeader.length - 1; c++) {
+      totals.push(dataRows.reduce((s,r) => s + (typeof r[c]==='number'?r[c]:0), 0));
+    }
+    const totalInc = totals[1];
+    const totalNet = totals[19];
+    totals.push(totalInc > 0 ? (totalNet/totalInc*100).toFixed(1)+'%' : '0%');
+    summaryRows.push(totals);
+  }
+  const ws1 = XLSX.utils.aoa_to_sheet(summaryRows);
+  ws1['!cols'] = summaryHeader.map((h,i) => ({ wch: i===0 ? 6 : 10 }));
+  XLSX.utils.book_append_sheet(wb, ws1, '收支總表');
 
-  // Sheet 2: 收入明細
-  const incRows = [['日期','科目','說明','金額','備註']];
-  items.filter(i=>i.type==='income').sort((a,b)=>a.date.localeCompare(b.date))
-    .forEach(i => incRows.push([i.date, i.cat, i.desc||'', i.amount, i.note||'']));
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(incRows), '收入明細');
+  // ── Sheets 2+: 每月細項 ──────────────────────────────────
+  months.forEach(m => {
+    const mi = allItems.filter(i => i.date.slice(5,7) === m);
+    if (!mi.length) return;
+    const year4 = year;
+    const daysInMonth = new Date(parseInt(year4), parseInt(m), 0).getDate();
+    const monthHeader = ['日期','收入','食材成本','包材成本','銷貨毛利','薪資/人事','行銷/公關','員工福利','營業費用','稅費','其他支出','淨利','備註'];
+    const monthRows = [monthHeader];
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dk = `${year4}-${m}-${String(d).padStart(2,'0')}`;
+      const di = mi.filter(i => i.date === dk);
+      if (!di.length) continue;
+      const inc   = di.filter(i=>i.type==='income').reduce((s,i)=>s+Number(i.amount),0);
+      const food  = di.filter(i=>i.cat==='原物料/食材').reduce((s,i)=>s+Number(i.amount),0);
+      const pack  = di.filter(i=>i.cat==='包材').reduce((s,i)=>s+Number(i.amount),0);
+      const gross = inc - food - pack;
+      const sal   = di.filter(i=>i.cat==='薪資/人事').reduce((s,i)=>s+Number(i.amount),0);
+      const mkpr  = di.filter(i=>['行銷費用','公關費用'].includes(i.cat)).reduce((s,i)=>s+Number(i.amount),0);
+      const wel   = di.filter(i=>i.cat==='員工福利').reduce((s,i)=>s+Number(i.amount),0);
+      const opex  = di.filter(i=>i.cat==='營業費用').reduce((s,i)=>s+Number(i.amount),0);
+      const tax   = di.filter(i=>i.cat==='稅費').reduce((s,i)=>s+Number(i.amount),0);
+      const other = di.filter(i=>i.type==='expense'&&!['原物料/食材','包材','薪資/人事','行銷費用','公關費用','員工福利','營業費用','稅費'].includes(i.cat)).reduce((s,i)=>s+Number(i.amount),0);
+      const exp   = di.filter(i=>i.type==='expense').reduce((s,i)=>s+Number(i.amount),0);
+      const net   = inc - exp;
+      const notes = di.filter(i=>i.desc||i.note).map(i=>[i.desc,i.note].filter(Boolean).join(' ')).join('；');
+      monthRows.push([dk, inc, food, pack, gross, sal, mkpr, wel, opex, tax, other, net, notes]);
+    }
+    // Monthly total row
+    if (monthRows.length > 1) {
+      const dr = monthRows.slice(1);
+      const tot = [parseInt(m)+'月 合計'];
+      for (let c = 1; c <= 11; c++) tot.push(dr.reduce((s,r)=>s+(typeof r[c]==='number'?r[c]:0),0));
+      tot.push('');
+      monthRows.push(tot);
+    }
+    const ws = XLSX.utils.aoa_to_sheet(monthRows);
+    ws['!cols'] = monthHeader.map((_,i) => ({ wch: i===0 ? 11 : 10 }));
+    XLSX.utils.book_append_sheet(wb, ws, parseInt(m)+'月');
+  });
 
-  // Sheet 3: 支出明細
-  const expRows = [['日期','科目','說明','金額','員工福利細項','備註']];
-  items.filter(i=>i.type==='expense').sort((a,b)=>a.date.localeCompare(b.date))
-    .forEach(i => expRows.push([i.date, i.cat, i.desc||'', i.amount, i.benefitSub||'', i.note||'']));
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(expRows), '支出明細');
-
-  // Sheet 4: 食材成本追蹤 (conditional)
-  const ingItems = items.filter(i=>i.cat==='原物料/食材'&&i.ingName);
-  if (ingItems.length) {
-    const ingRows = [['日期','品名','單位重量','單位','數量','單價','合計']];
-    ingItems.sort((a,b)=>a.date.localeCompare(b.date)).forEach(i =>
-      ingRows.push([i.date, i.ingName||'', i.ingWeight||'', i.ingUnit||'', i.ingQty||'', i.ingUnitPrice||'', i.amount]));
-    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(ingRows), '食材成本追蹤');
+  // ── Sheet: 成本表 ────────────────────────────────────────
+  const costCats = ['原物料/食材','包材','薪資/人事','租金/水電','行銷費用','公關費用','裝潢工程','出國參展-機票','出國參展-住宿','國際空運','百貨抽成','員工福利','營業費用','稅費','雜支'];
+  const costRows = [];
+  const expItems = allItems.filter(i=>i.type==='expense').sort((a,b)=>a.date.localeCompare(b.date));
+  costCats.forEach(cat => {
+    const catItems = expItems.filter(i=>i.cat===cat);
+    if (!catItems.length) return;
+    const catTotal = catItems.reduce((s,i)=>s+Number(i.amount),0);
+    costRows.push([cat, '', '', '', '', '', catTotal]);
+    costRows.push(['日期','說明','品名','數量','單位','單價','金額']);
+    catItems.forEach(item => {
+      if (item.subItems && item.subItems.length) {
+        item.subItems.forEach(sub => {
+          costRows.push([item.date, item.desc||'', sub.name, sub.qty, sub.unit, sub.unitPrice, sub.subtotal]);
+        });
+      } else {
+        costRows.push([item.date, item.desc||'', item.ingName||'', item.ingQty||'', item.ingUnit||'', item.ingUnitPrice||'', item.amount]);
+      }
+    });
+    costRows.push(['', '', '', '', '', '小計', catTotal]);
+    costRows.push([]);
+  });
+  if (costRows.length) {
+    const wsCost = XLSX.utils.aoa_to_sheet(costRows);
+    wsCost['!cols'] = [11,16,12,6,6,8,10].map(w => ({ wch: w }));
+    XLSX.utils.book_append_sheet(wb, wsCost, '成本表');
   }
 
-  const filename = `半吊子廚房_帳本_${year}${month||''}.xlsx`;
+  const filename = `半吊子廚房_帳本_${year}${month?'_'+parseInt(month)+'月':''}.xlsx`;
   XLSX.writeFile(wb, filename);
   toast('Excel 已下載 ✓', 'success');
 }
+
 
 // ════════════════════════════════════════════════════════
 // SETTINGS
@@ -2106,6 +2148,204 @@ function toast(msg, type = '') {
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => { el.className = 'toast'; }, 2500);
 }
+
+// ════════════════════════════════════════════════════════
+// MATERIAL LIBRARY
+// ════════════════════════════════════════════════════════
+function getMaterials() { return appData.materials || []; }
+
+function saveMaterial() {
+  const id = document.getElementById('matEditId').value;
+  const name = document.getElementById('matName').value.trim();
+  const cat = document.getElementById('matCat').value;
+  const unit = document.getElementById('matUnit').value;
+  const note = document.getElementById('matNote').value.trim();
+  if (!name) { toast('請輸入品名', 'error'); return; }
+  if (!appData.materials) appData.materials = [];
+  if (id) {
+    const idx = appData.materials.findIndex(m => m.id == id);
+    if (idx !== -1) appData.materials[idx] = { ...appData.materials[idx], name, cat, unit, note };
+    toast('材料已更新 ✓', 'success');
+  } else {
+    appData.materials.push({ id: Date.now(), name, cat, unit, note });
+    toast('材料已新增 ✓', 'success');
+  }
+  debounceSave();
+  closeMatForm();
+  renderMaterials();
+}
+
+function deleteMaterial(id) {
+  if (!confirm('確定要刪除這個材料？')) return;
+  appData.materials = (appData.materials || []).filter(m => m.id != id);
+  debounceSave();
+  renderMaterials();
+  toast('已刪除', 'success');
+}
+
+function openMatForm(id) {
+  const card = document.getElementById('matFormCard');
+  card.classList.remove('hidden');
+  // Populate unit select
+  const unitEl = document.getElementById('matUnit');
+  unitEl.innerHTML = MAT_UNITS.map(u => `<option value="${u}">${u}</option>`).join('');
+  if (id) {
+    const mat = getMaterials().find(m => m.id == id);
+    if (!mat) return;
+    document.getElementById('matFormTitle').textContent = '編輯材料';
+    document.getElementById('matEditId').value = mat.id;
+    document.getElementById('matName').value = mat.name;
+    document.getElementById('matCat').value = mat.cat;
+    unitEl.value = mat.unit;
+    document.getElementById('matNote').value = mat.note || '';
+  } else {
+    document.getElementById('matFormTitle').textContent = '新增材料';
+    document.getElementById('matEditId').value = '';
+    document.getElementById('matName').value = '';
+    document.getElementById('matCat').value = '原物料/食材';
+    document.getElementById('matNote').value = '';
+  }
+  card.scrollIntoView({ behavior: 'smooth' });
+}
+
+function closeMatForm() {
+  document.getElementById('matFormCard').classList.add('hidden');
+}
+
+function renderMaterials() {
+  const filterCat = document.getElementById('matFilterCat').value;
+  const search = (document.getElementById('matSearch').value || '').toLowerCase();
+  let mats = getMaterials().filter(m => {
+    if (filterCat && m.cat !== filterCat) return false;
+    if (search && !m.name.toLowerCase().includes(search)) return false;
+    return true;
+  });
+  const el = document.getElementById('matList');
+  if (!mats.length) {
+    el.innerHTML = '<div class="empty"><div class="empty-icon">📦</div>尚無材料，點右上角新增</div>';
+    return;
+  }
+  // Group by category
+  const bycat = {};
+  mats.forEach(m => { if (!bycat[m.cat]) bycat[m.cat] = []; bycat[m.cat].push(m); });
+  let html = '';
+  Object.entries(bycat).forEach(([cat, items]) => {
+    html += `<div style="margin-bottom:14px">
+      <div class="section-label" style="margin-bottom:8px">${cat}</div>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th>品名</th><th>單位</th><th>備註</th><th></th></tr></thead>
+        <tbody>${items.map(m => `<tr>
+          <td><strong>${m.name}</strong></td>
+          <td><span class="badge" style="background:var(--paper);color:var(--ink2)">${m.unit}</span></td>
+          <td style="color:var(--ink3);font-size:12px">${m.note || ''}</td>
+          <td class="td-actions">
+            <button class="icon-btn" onclick="openMatForm(${m.id})" title="編輯">✏️</button>
+            <button class="icon-btn del" onclick="deleteMaterial(${m.id})" title="刪除">🗑</button>
+          </td>
+        </tr>`).join('')}</tbody>
+      </table></div>
+    </div>`;
+  });
+  el.innerHTML = html;
+}
+
+// ════════════════════════════════════════════════════════
+// SUB-ITEMS (for 原物料/食材 and 包材)
+// ════════════════════════════════════════════════════════
+function populateSubMatSelect() {
+  const cat = document.getElementById('manCat').value;
+  const sel = document.getElementById('subMatSelect');
+  const mats = getMaterials().filter(m => m.cat === cat);
+  sel.innerHTML = '<option value="">-- 選擇材料（選填）--</option>' +
+    mats.map(m => `<option value="${m.id}">${m.name}（${m.unit}）</option>`).join('');
+  // Populate unit select
+  const unitEl = document.getElementById('subUnit');
+  unitEl.innerHTML = MAT_UNITS.map(u => `<option value="${u}">${u}</option>`).join('');
+}
+
+function onSubMatSelect() {
+  const id = document.getElementById('subMatSelect').value;
+  if (!id) return;
+  const mat = getMaterials().find(m => m.id == id);
+  if (!mat) return;
+  document.getElementById('subName').value = mat.name;
+  document.getElementById('subUnit').value = mat.unit;
+  document.getElementById('subQty').focus();
+}
+
+function calcSubTotal() {
+  const qty = Number(document.getElementById('subQty').value) || 0;
+  const price = Number(document.getElementById('subUnitPrice').value) || 0;
+  document.getElementById('subSubtotal').value = qty * price || '';
+}
+
+function openAddSubItem() {
+  populateSubMatSelect();
+  document.getElementById('subItemForm').classList.remove('hidden');
+  ['subMatSelect','subName','subQty','subUnitPrice','subSubtotal'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  const unitEl = document.getElementById('subUnit');
+  unitEl.innerHTML = MAT_UNITS.map(u => `<option value="${u}">${u}</option>`).join('');
+}
+
+function cancelAddSubItem() {
+  document.getElementById('subItemForm').classList.add('hidden');
+}
+
+function confirmAddSubItem() {
+  const name = document.getElementById('subName').value.trim();
+  const qty = Number(document.getElementById('subQty').value) || 0;
+  const unit = document.getElementById('subUnit').value;
+  const unitPrice = Number(document.getElementById('subUnitPrice').value) || 0;
+  const subtotal = qty * unitPrice;
+  if (!name) { toast('請輸入品名', 'error'); return; }
+  manSubItems.push({ name, qty, unit, unitPrice, subtotal });
+  document.getElementById('subItemForm').classList.add('hidden');
+  renderSubItemsUI();
+  // Auto-fill total amount
+  updateManAmountFromSubs();
+}
+
+function removeSubItem(idx) {
+  manSubItems.splice(idx, 1);
+  renderSubItemsUI();
+  updateManAmountFromSubs();
+}
+
+function updateManAmountFromSubs() {
+  const total = manSubItems.reduce((s, i) => s + i.subtotal, 0);
+  if (total > 0) document.getElementById('manAmount').value = total;
+}
+
+function renderSubItemsUI() {
+  const el = document.getElementById('subItemsList');
+  const totalEl = document.getElementById('subItemTotal');
+  if (!manSubItems.length) { el.innerHTML = ''; totalEl.style.display = 'none'; return; }
+  const total = manSubItems.reduce((s, i) => s + i.subtotal, 0);
+  el.innerHTML = `<table style="width:100%;font-size:12px;border-collapse:collapse">
+    <thead><tr style="background:var(--paper)">
+      <th style="padding:6px 8px;text-align:left">品名</th>
+      <th style="padding:6px 8px;text-align:left">數量</th>
+      <th style="padding:6px 8px;text-align:left">單位</th>
+      <th style="padding:6px 8px;text-align:left">單價</th>
+      <th style="padding:6px 8px;text-align:right">小計</th>
+      <th style="padding:6px 8px"></th>
+    </tr></thead>
+    <tbody>${manSubItems.map((item,i) => `<tr style="border-top:1px solid var(--border)">
+      <td style="padding:6px 8px"><strong>${item.name}</strong></td>
+      <td style="padding:6px 8px">${item.qty}</td>
+      <td style="padding:6px 8px">${item.unit}</td>
+      <td style="padding:6px 8px">$${item.unitPrice}</td>
+      <td style="padding:6px 8px;text-align:right;font-family:'Noto Serif TC',serif;color:var(--green)">$${item.subtotal.toLocaleString()}</td>
+      <td style="padding:6px 8px"><button class="icon-btn del" onclick="removeSubItem(${i})" style="font-size:12px">✕</button></td>
+    </tr>`).join('')}</tbody>
+  </table>`;
+  document.getElementById('subItemTotalAmt').textContent = '$' + total.toLocaleString('zh-TW');
+  totalEl.style.display = 'block';
+}
+
 
 // ════════════════════════════════════════════════════════
 // BOOT
